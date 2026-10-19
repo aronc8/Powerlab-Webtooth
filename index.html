@@ -1,0 +1,1399 @@
+<meta charset="utf-8">
+<title>PL8 Remote</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#11171d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow+Semi+Condensed:wght@400;500;600&family=VT323&display=swap">
+<style>
+/* Layout: bench-instrument panel. Phone = one column (LCD, readouts, action, cells, chart, presets).
+   Wide = two columns: live readings left, controls/presets right. */
+:root {
+  --bg: #e6e9ec;
+  --panel: #f5f6f7;
+  --panel-2: #eceff1;
+  --ink: #141c24;
+  --muted: #586572;
+  --line: #c8cfd6;
+  --accent: #a85f00;
+  --accent-ink: #ffffff;
+  --accent-soft: #f3e3cc;
+  --lcd-bg: #1e3f8c;
+  --lcd-fg: #e9f1ff;
+  --lcd-dim: #8fa8de;
+  --ok: #1d7448;
+  --ok-soft: #d7ecdf;
+  --warn: #9a5c00;
+  --warn-soft: #f4e5c8;
+  --bad: #b0261d;
+  --bad-soft: #f6d9d5;
+  --info: #2457b8;
+  --chart-v: #a85f00;
+  --chart-a: #2457b8;
+  --chart-grid: #d5dbe0;
+
+  --f-ui: "Barlow Semi Condensed", "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-num: "Barlow Condensed", "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-lcd: "VT323", "Courier New", ui-monospace, monospace;
+
+  --r: 6px;
+  --gap: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1318; --panel: #151c23; --panel-2: #1a222a; --ink: #e4e9ee; --muted: #8b98a6; --line: #26313b;
+    --accent: #f0a72c; --accent-ink: #1b1204; --accent-soft: #3a2a10;
+    --lcd-bg: #1b3b88; --lcd-fg: #e2ecff; --lcd-dim: #7f99d6;
+    --ok: #46c98a; --ok-soft: #12301f; --warn: #f0a72c; --warn-soft: #3a2a10; --bad: #ff6f62; --bad-soft: #3d1714; --info: #74a3ff;
+    --chart-v: #f0a72c; --chart-a: #74a3ff; --chart-grid: #222c35;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1318; --panel: #151c23; --panel-2: #1a222a; --ink: #e4e9ee; --muted: #8b98a6; --line: #26313b;
+  --accent: #f0a72c; --accent-ink: #1b1204; --accent-soft: #3a2a10;
+  --lcd-bg: #1b3b88; --lcd-fg: #e2ecff; --lcd-dim: #7f99d6;
+  --ok: #46c98a; --ok-soft: #12301f; --warn: #f0a72c; --warn-soft: #3a2a10; --bad: #ff6f62; --bad-soft: #3d1714; --info: #74a3ff;
+  --chart-v: #f0a72c; --chart-a: #74a3ff; --chart-grid: #222c35;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-ui); font-size: 15px; line-height: 1.4;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 32px;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+
+/* header */
+.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding-block: 12px 10px;
+  border-bottom: 1px solid var(--line); margin-bottom: var(--gap);
+}
+.brand { display: flex; align-items: baseline; gap: 8px; margin-right: auto; }
+.brand b { font-family: var(--f-num); font-size: 24px; font-weight: 600; letter-spacing: .02em; }
+.brand span { color: var(--muted); font-size: 13px; }
+.link { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; padding: 4px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); }
+.link i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.link[data-s="demo"] i { background: var(--info); }
+.link[data-s="live"] i { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+.link[data-s="lost"] i { background: var(--bad); }
+.link[data-s="busy"] i { background: var(--warn); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 16px; border-radius: var(--r);
+  border: 1px solid var(--line); background: var(--panel); cursor: pointer; font-weight: 600; letter-spacing: .01em; }
+.btn:hover { border-color: var(--muted); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.stop { background: var(--bad); border-color: var(--bad); color: #fff; }
+.btn.ack { background: var(--warn); border-color: var(--warn); color: var(--accent-ink); }
+.btn.ghost { background: transparent; }
+.btn.big { min-height: 56px; font-size: 18px; flex: 1 1 200px; }
+.btn.sm { min-height: 32px; padding: 0 10px; font-size: 13px; }
+
+.notice { border: 1px solid var(--line); background: var(--panel); border-radius: var(--r); padding: 10px 14px; margin-bottom: var(--gap); font-size: 14px; }
+.notice.bad { border-color: var(--bad); background: var(--bad-soft); }
+.notice.warn { border-color: var(--warn); background: var(--warn-soft); }
+.notice b { font-weight: 600; }
+
+/* grid */
+.grid { display: grid; gap: var(--gap); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 980px) { .grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; } }
+.col { display: grid; gap: var(--gap); min-width: 0; }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; min-width: 0; }
+.panel > h2 { margin: 0 0 10px; font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.panel > h2 .aside { margin-left: auto; letter-spacing: .02em; text-transform: none; font-weight: 500; }
+
+/* LCD */
+.lcd { background: var(--lcd-bg); color: var(--lcd-fg); border-radius: 4px; padding: 12px 16px; font-family: var(--f-lcd); font-size: 27px; line-height: 1.05;
+  box-shadow: inset 0 0 0 3px #0b1a3f, inset 0 0 24px rgba(0,0,0,.35); position: relative; overflow: hidden; }
+.lcd div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lcd .l2 { color: var(--lcd-fg); }
+.lcd .src { position: absolute; right: 10px; top: 6px; font-family: var(--f-ui); font-size: 11px; letter-spacing: .1em; color: var(--lcd-dim); text-transform: uppercase; }
+
+/* state strip */
+.state { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; border: 1px solid transparent; }
+.pill.idle { background: var(--panel-2); border-color: var(--line); color: var(--muted); }
+.pill.run { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.pill.done { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+.pill.err { background: var(--bad-soft); color: var(--bad); border-color: var(--bad); }
+.pill.wait { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+.state .why { color: var(--muted); font-size: 13px; }
+
+/* readouts */
+.reads { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; margin-top: 14px; }
+@media (min-width: 620px) { .reads { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.read { background: var(--panel); padding: 10px 12px 12px; min-width: 0; }
+.read .k { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.read .v { font-family: var(--f-num); font-variant-numeric: tabular-nums; font-size: 40px; font-weight: 600; line-height: 1.05; white-space: nowrap; }
+.read .v small { font-size: 18px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+.read .s { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.read.minor .v { font-size: 26px; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+
+/* cells */
+.cells { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 520px) { .cells { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.cell { border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px 10px; background: var(--panel-2); min-width: 0; }
+.cell.off { opacity: .38; }
+.cell .h { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .06em; }
+.cell .h .tag { letter-spacing: .02em; }
+.cell .h .tag.hi { color: var(--accent); }
+.cell .h .tag.lo { color: var(--info); }
+.cell .cv { font-family: var(--f-num); font-variant-numeric: tabular-nums; font-size: 28px; font-weight: 600; line-height: 1.1; }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin: 4px 0 6px; }
+.bar i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .4s; }
+.cell .f { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.delta { font-variant-numeric: tabular-nums; }
+.delta.warn { color: var(--warn); }
+.delta.bad { color: var(--bad); }
+
+/* chart */
+.chart-wrap { position: relative; height: 220px; }
+canvas#chart { width: 100%; height: 100%; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); margin-top: 6px; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+
+/* presets */
+.presets { display: grid; gap: 4px; max-height: 460px; overflow: auto; margin: 0 -4px; padding: 0 4px; }
+.preset { display: grid; grid-template-columns: 30px 46px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 7px 8px; border-radius: var(--r);
+  border: 1px solid transparent; background: transparent; text-align: left; cursor: pointer; width: 100%; }
+.preset:hover { background: var(--panel-2); }
+.preset.cur { border-color: var(--accent); background: var(--accent-soft); }
+.preset[aria-disabled="true"] { cursor: default; opacity: .5; }
+.preset .n { font-family: var(--f-num); font-size: 18px; color: var(--muted); text-align: right; }
+.chem { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-align: center; padding: 2px 0; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); }
+.preset .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.preset .meta { font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) {
+  .preset { grid-template-columns: 26px 46px minmax(0, 1fr); row-gap: 0; }
+  .preset .meta { grid-column: 3; }
+  .preset .n, .preset .chem { grid-row: span 2; align-self: center; }
+}
+.empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+
+/* settings + log */
+.rows { display: grid; gap: 10px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.row label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.row .lbl { color: var(--muted); font-size: 13px; min-width: 110px; }
+select, input[type="number"] { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 8px; }
+input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+pre.log { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; line-height: 1.45; background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 8px 10px; max-height: 240px; overflow: auto; white-space: pre-wrap; word-break: break-all; margin: 8px 0 0; }
+.stats { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.foot { margin-top: 20px; font-size: 12.5px; color: var(--muted); max-width: 75ch; }
+
+/* start dialog */
+dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); padding: 0; width: min(460px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgba(5, 10, 16, .55); }
+dialog form { padding: 18px 18px 16px; display: grid; gap: 14px; }
+dialog h3 { margin: 0; font-family: var(--f-num); font-size: 24px; font-weight: 600; }
+.seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.seg label { border: 1px solid var(--line); border-radius: var(--r); padding: 10px 4px; text-align: center; cursor: pointer; font-weight: 600; background: var(--panel-2); }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg label:has(input:disabled) { opacity: .4; cursor: not-allowed; }
+.dlg-note { font-size: 13px; color: var(--muted); margin: 0; }
+.dlg-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+
+<header class="top">
+  <div class="brand"><b>PL8 Remote</b><span>PowerLab 8 over Bluetooth</span></div>
+  <span class="link" id="linkChip" data-s="demo"><i></i><span id="linkText">Demo charger</span></span>
+  <button class="btn primary" id="btnConnect" type="button" title="ESP32 PL8-Bridge (Bluetooth LE)">Connect bridge</button>
+  <button class="btn" id="btnSerial" type="button" title="HC-05 or other Bluetooth serial adapter, or a FUIM3 on USB">Serial / HC-05</button>
+  <button class="btn ghost" id="btnDisconnect" type="button" hidden>Disconnect</button>
+</header>
+
+<div class="notice" id="bannerDemo"><b>Demo mode.</b> You're looking at a simulated PowerLab 8 running the real protocol. Press <b>Connect bridge</b> for the ESP32 PL8-Bridge, or <b>Serial / HC-05</b> for a paired HC-05 or a FUIM3 plugged into this computer.</div>
+<div class="notice bad" id="bannerBle" hidden></div>
+<div class="notice warn" id="bannerLost" hidden><b>Connection lost.</b> The charger keeps running on its own. Reconnecting…</div>
+
+<main class="grid">
+  <div class="col">
+    <section class="panel" aria-label="Charger status">
+      <div class="lcd" aria-live="polite"><span class="src" id="lcdSrc">Ram0</span><div class="l1" id="lcd1">&nbsp;</div><div class="l2" id="lcd2">&nbsp;</div></div>
+      <div class="state">
+        <span class="pill idle" id="modePill">Ready</span>
+        <span class="why" id="powerWhy"></span>
+      </div>
+      <div class="reads">
+        <div class="read"><div class="k">Pack</div><div class="v"><span id="rPack">0.000</span><small>V</small></div><div class="s" id="rPackS">—</div></div>
+        <div class="read"><div class="k" id="rAmpK">Current</div><div class="v"><span id="rAmps">0.00</span><small>A</small></div><div class="s" id="rAmpsS">Set —</div></div>
+        <div class="read"><div class="k" id="rCapK">Into pack</div><div class="v"><span id="rCap">0</span><small>mAh</small></div><div class="s" id="rCapS">—</div></div>
+        <div class="read"><div class="k">Elapsed</div><div class="v"><span id="rTime">0:00</span></div><div class="s" id="rTimeS">—</div></div>
+        <div class="read minor"><div class="k">Supply</div><div class="v"><span id="rSup">0.0</span><small>V</small></div><div class="s" id="rSupS">0.0 A in</div></div>
+        <div class="read minor"><div class="k">Power</div><div class="v"><span id="rWatts">0</span><small>W</small></div><div class="s" id="rWattsS">to pack</div></div>
+        <div class="read minor"><div class="k">Charger temp</div><div class="v"><span id="rTemp">—</span><small>°F</small></div><div class="s" id="rTempS">—</div></div>
+        <div class="read minor"><div class="k">Fuel</div><div class="v"><span id="rFuel">—</span><small>%</small></div><div class="s" id="rFuelS">—</div></div>
+      </div>
+      <div class="actions" id="actions"></div>
+    </section>
+
+    <section class="panel" aria-label="Cells">
+      <h2>Cells <span class="aside"><span class="delta" id="cellDelta">Δ —</span></span></h2>
+      <div class="cells" id="cells"></div>
+    </section>
+
+    <section class="panel" aria-label="Chart">
+      <h2>This run <span class="aside"><button class="btn sm ghost" id="btnClearChart" type="button">Clear</button></span></h2>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+      <div class="legend"><span><i style="background:var(--chart-v)"></i>Pack volts</span><span><i style="background:var(--chart-a)"></i>Amps</span><span id="chartInfo"></span></div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="panel" aria-label="Presets">
+      <h2>Presets <span class="aside"><button class="btn sm" id="btnPresets" type="button">Read from charger</button></span></h2>
+      <div class="presets" id="presets"><div class="empty">Presets haven't been read yet. Reading takes about 5 seconds.</div></div>
+    </section>
+
+    <section class="panel" aria-label="Session">
+      <h2>Session</h2>
+      <div class="rows">
+        <div class="row"><span class="lbl">Alerts</span>
+          <label><input type="checkbox" id="optSound" checked> Sound</label>
+          <label><input type="checkbox" id="optVibrate" checked> Vibrate</label>
+          <button class="btn sm ghost" id="btnTestAlert" type="button">Test</button>
+        </div>
+        <div class="row"><span class="lbl">Screen</span><label><input type="checkbox" id="optWake"> Keep screen on</label></div>
+        <div class="row"><span class="lbl">Poll every</span>
+          <select id="optPoll"><option value="500">0.5 s</option><option value="1000" selected>1 s</option><option value="2000">2 s</option><option value="5000">5 s</option></select>
+        </div>
+        <div class="row"><span class="lbl">Serial speed</span>
+          <select id="optBaud"><option value="19200" selected>19200 (PowerLab spec)</option><option value="auto">Auto (try 19200, then 115200)</option><option value="115200">115200</option></select>
+          <span class="stats" id="baudInfo">USB serial only; Bluetooth serial ignores it</span>
+        </div>
+        <div class="row" id="rowSpeed"><span class="lbl">Demo speed</span>
+          <select id="optSpeed"><option value="1">Real time</option><option value="10">10×</option><option value="30" selected>30×</option><option value="120">120×</option></select>
+        </div>
+        <div class="row"><span class="lbl">Run log</span>
+          <button class="btn sm" id="btnCopyCsv" type="button">Copy CSV</button>
+          <button class="btn sm" id="btnSaveCsv" type="button">Save CSV</button>
+          <span class="stats" id="csvInfo">0 samples</span>
+        </div>
+      </div>
+      <details style="margin-top:12px">
+        <summary>Serial traffic</summary>
+        <div class="stats" id="stats" style="margin-top:6px">—</div>
+        <pre class="log" id="log"></pre>
+      </details>
+    </section>
+
+    <p class="foot">Uses the PowerLab 8 serial protocol published by Revolectrix (Ram status packet, SelP, SelC/D/M/Y, SelE) at 19200 baud, through the ESP32 PL8-Bridge (Bluetooth LE), a Bluetooth serial adapter such as an HC-05, or a FUIM3 on USB. Safety screens still have to be acknowledged, and the charger enforces its own limits whatever this page sends. Works in Chrome or Edge on Android, Windows, macOS, Linux and ChromeOS.</p>
+  </div>
+</main>
+
+<dialog id="dlgStart">
+  <form method="dialog" id="formStart">
+    <h3 id="dlgTitle">Start</h3>
+    <div>
+      <div class="dlg-note" style="margin-bottom:6px">Operation</div>
+      <div class="seg" id="segOp">
+        <label><input type="radio" name="op" value="C" checked>Charge</label>
+        <label><input type="radio" name="op" value="D">Discharge</label>
+        <label><input type="radio" name="op" value="M">Monitor</label>
+        <label><input type="radio" name="op" value="Y">Cycle</label>
+      </div>
+    </div>
+    <div class="row">
+      <span class="lbl">Packs in parallel</span>
+      <select id="selPacks"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select>
+    </div>
+    <div class="row"><label><input type="checkbox" id="chkBananas" checked> Main leads connected (bananas)</label></div>
+    <p class="dlg-note" id="dlgNote">Without the main leads the PowerLab charges through the balance wires only, limited to 3 A.</p>
+    <div class="dlg-actions">
+      <button class="btn ghost" value="cancel" type="submit">Cancel</button>
+      <button class="btn primary" value="ok" id="btnStartGo" type="submit">Start</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+/* =====================================================================
+   PowerLab 8 protocol core  (no DOM in this block)
+   Source: Revolectrix "Remote Control a Single PowerLab 8v2" + Charge Control.
+   ===================================================================== */
+const PL = (() => {
+  const enc = s => Array.from(s, c => c.charCodeAt(0));
+
+  function crc16(bytes, init, from = 0, to = bytes.length) {
+    let c = init;
+    for (let i = from; i < to; i++) {
+      let d = bytes[i];
+      for (let b = 0; b < 8; b++) {
+        if ((d ^ c) & 1) c = (c >>> 1) ^ 0x8408; else c >>>= 1;
+        d >>>= 1;
+      }
+    }
+    return c;
+  }
+  const CRC_RAM = 2342, CRC_SELP = 4372, CRC_PRST = 6372, ACK = 0x05DC;
+  const RAM_LEN = 149, PRST_LEN = 7682;
+
+  const CHEM = { 0: "", 1: "LiPo", 2: "LiIn", 3: "A123", 4: "LiMn", 5: "LiCo", 6: "NiCd", 7: "NiMH", 8: "Lead", 9: "LiFe", 10: "Prim", 11: "Sply" };
+  const CHEM_LONG = { 1: "Lithium polymer", 2: "Lithium ion", 3: "A123", 4: "Lithium manganese", 5: "Lithium cobalt", 6: "NiCd", 7: "NiMH", 8: "Lead acid", 9: "LiFe", 10: "Primary", 11: "Power supply" };
+  // Cell bar ranges by chemistry (empty → full), volts
+  const RANGE = { 1: [3.0, 4.2], 2: [3.0, 4.1], 3: [2.5, 3.6], 4: [3.0, 4.2], 5: [3.0, 4.2], 6: [0.9, 1.55], 7: [0.9, 1.55], 8: [1.8, 2.45], 9: [2.5, 3.65], 10: [0.9, 1.6], 11: [0, 5] };
+
+  const REDUCE = { 0: "Full power", 1: "Reduced: supply current limit", 2: "Maximum input limit", 3: "Reduced: cell sum error", 4: "Reduced: supply noise", 5: "Reduced: high temp", 6: "Reduced: low input voltage", 7: "Constant voltage", 8: "Discharge limited to 100 W", 9: "Discharge reduced: high temp", 10: "Regen max amps reached", 11: "Discharge reduced: high temp", 12: "Discharge reduced: cell error", 13: "Regen volt limit reached", 14: "Discharge reduced: below average", 15: "Reduced: above average", 16: "Supply low for high power" };
+
+  const ERR = {"1":"Increase Supply","2":"Supply Less than 10V","3":"Supply Above 32 volts","4":"Supply Unstable","5":"Preset not for 8S","6":"Bad Preset Version","7":"NiCd Amps HiTemp","8":"Possible Series Chargers","9":"Preset Library Empty","10":"Low Voltage Cell","11":"Preset is Hidden","12":"Reverse Polarity","13":"Preset is Empty","14":"ENTER not Pressed","15":"System SOFTSTART","16":"Preset is Locked","17":"Cells No Add Up","18":"Max Cells Error","19":"No Pack","20":"Bad Cell Count","21":"Bad Expansion Channel Number","22":"Cells Exceeded","23":"Un-Bal. Only","24":"Charge Timeout","25":"Cell Count Changed","26":"NiCd Detected","27":"Cells Count not Correct","28":"Cell Over Voltage","29":"High Temperature","30":"Supply Increased 33%","31":"Expansion Channel Comm. Error","32":"Safety Charge Stop","33":"Low Dsch. Volts","34":"Wrong Cell Count","35":"Supply V. down 37%","36":"Supply < Low Limit","37":"Options Corrupt","38":"High Node V. Drop","39":"Expansion Ch. Comm. Error","40":"Node Over Amps","41":"1 Master allowed","42":"Error on Expansion Ch.","43":"Error on Master","44":"Banana Over Amps","45":"WDT System Reset","46":"SVS System Reset","47":"Bananas Removed","48":"Negative Amps","49":"Charge not Allowed","50":"Cell Too High or Low","51":"Pack Below 3.0V","52":"Low Volt (Replace Bad Pack)","78":"High Voltage When off","79":"CH1 Cell Count out of Range","80":"Regen High Volt is corrupt","81":"CHSNUMBER stuck in a loop","82":"Amps Out of Range","83":"Low Supply Volt is corrupt","84":"Regen and Charge are Enabled","85":"Amps Negative in Charge","86":"Amps Positive in Dischage","87":"Regen with no Discharge","88":"AMPSDSCHRANGE in Charge Mode","89":"Supply Battery has changed","90":"Unknown Screen Number","92":"Mux Number Error","93":"Calibration Checksum is Bad","94":"Bad EEPROM Write","95":"Bypass Overvolt","96":"PWM Ratio Too High","97":"Amps were not read on Startup","98":"P_RAMPRESET not Master","99":"Bad Mode Number","100":"Temp Out of Range","105":"Preset not Validated","106":"Preset number out of Range","107":"Charge Timeout out of Range","108":"Preset Loaded while Charging","109":"Charge Termination Unknown","110":"Exp. Ch. found in Mode 30","111":"Preset Cell OverVolts too High","112":"MEASUREDDUTY > 1024","113":"Charge PWM not Regulating","114":"Bad Preset Checksum while Running","115":"Bad Preset Checksum on Start","116":"Bad Ram Checksum on Start","117":"Bad Segment Checksum on Start","118":"Bad Segment Checksum Running","119":"Banans Connected while charging","120":"Cell Count not Verified","121":"Shunt FET off while Chg./Dsch.","122":"Unknown Chemistry","123":"No Charge Screens to Show","124":"Bad Run Screen Number","125":"Cell Count is Zero","126":"Recursive Overflow","127":"Discharge Mode Timeout","128":"Peek Detect set past 15 minutes","129":"NiCd Chem must use FallBack","130":"Lithium chem must not use FallBack","131":"Oscillator Calibration Erased","132":"Bad Amps Calibration","133":"PWM Duty cycle Too Low","134":"Bad Options on Exp. Ch.","135":"Zero Amps PWM Too High","136":"Charge and Discharge Enabled","137":"Bad Preset Checksum in Ram ","138":"Discharge Amps are Positive","139":"Discharge over 120 Watts","140":"Charge A. Set Too Low","141":"Cell Detection Min is Zero","142":"No Prev Charge Screens to Show","143":"Corrupt Charge Voltage","144":"Copy Preset Error","145":"Discharge Set Amps Out of Range","146":"Discharge Cutoff Volts Error","147":"Discharge and Bypass are Enabled","149":"Bypass and Discharge @ Same Time","151":"PWMOUT16 is Zero","152":"Switching Frequency Changed","153":"Available","154":"Bad Expansion Ch. Preset CRC","155":"Exp. Ch. Start Error 1","156":"Network Buffer Full","157":"Unknown NETBUFFER Command","158":"Available","159":"Discharge Over Current","200":"Memory Dump Location 0","201":"Memory Dump Location 1","202":"Memory Dump Location 2","203":"Manual Memory Dump","204":"Memory Dump Location 4","205":"Memory Dump Location 5","206":"Memory Dump Location 6","207":"Memory Dump Location 7","208":"Memory Dump Location 8","209":"Memory Dump Location 9","210":"Memory Dump Location 10"};
+
+  const u16 = (b, o) => (b[o] << 8) | b[o + 1];
+  const s16 = (b, o) => { const v = u16(b, o); return v > 32767 ? v - 65536 : v; };
+  const u32 = (b, o) => ((b[o] << 24) >>> 0) + (b[o + 1] << 16) + (b[o + 2] << 8) + b[o + 3];
+  const bit = (v, n) => ((v >> n) & 1) === 1;
+  const K46 = 46.96 / 4095;
+
+  // ---- request builders: bytes sent, reply length after the echo, reply validator
+  const ram = (id = 0) => ({ name: "Ram" + id, tx: [...enc("Ram"), id], len: RAM_LEN,
+    ok: r => u16(r, 147) === crc16(r, CRC_RAM, 0, 147) });
+  const selP = n => { const want = crc16([n], CRC_SELP); return { name: "SelP" + n, tx: [...enc("SelP"), n], len: 2, ok: r => u16(r, 0) === want }; };
+  // op: C charge, D discharge, M monitor, Y cycle, E enter (stop / acknowledge / clear)
+  // packs: 1..8 → 'l'..'s'; lowercase op = without bananas (balance leads only)
+  const sel = (op, packs = 1, bananas = true) => {
+    const p = op === "E" ? "l" : String.fromCharCode(0x6B + Math.min(8, Math.max(1, packs)));
+    const o = op === "E" ? "E" : (bananas ? op.toUpperCase() : op.toLowerCase());
+    return { name: "Se" + p + o, tx: [0x53, 0x65, p.charCodeAt(0), o.charCodeAt(0)], len: 2, ok: r => u16(r, 0) === ACK };
+  };
+  const prst = () => ({ name: "Prst", tx: enc("Prst"), len: PRST_LEN, ok: r => u16(r, 7680) === crc16(r, CRC_PRST, 0, 7680) });
+
+  // ---- status packet (147 data bytes + CRC) → object
+  function parseStatus(b) {
+    const cellsRaw = []; for (let i = 0; i < 8; i++) cellsRaw.push(u16(b, 2 + i * 2) * 5.12 / 65536);
+    const flags = u16(b, 44), rx = u16(b, 46), st2 = u16(b, 50), st6 = u16(b, 76);
+    const chgSec = u16(b, 28), chgMin = u16(b, 78);
+    const vrAmps = u16(b, 68) / 600;
+    const vrOff = u16(b, 114) / 6.3984;            // mV
+    const vr = []; for (let i = 0; i < 8; i++) vr.push(u16(b, 52 + i * 2) / 6.3984);
+    const ir = vr.map((v, i) => vrAmps > 0 ? (i === 0 ? (v - vrOff) : v) / vrAmps : 0);
+    const mode = b[133];
+    const packs = Math.max(1, b[136] || 1);
+    const s = {
+      fw: u16(b, 0) / 100,
+      cells: cellsRaw,
+      cellCount: b[132],
+      pwm: u16(b, 18),
+      csetAmps: u16(b, 20) / 600,
+      supplyLoaded: u16(b, 22) * K46 / 16,
+      supplyV: u16(b, 24) * K46,
+      tempC: (2.5 * u16(b, 26) / 4095 - 0.986) / 0.00355,
+      seconds: chgSec >= 64799 ? chgSec - 64800 + chgMin * 60 : chgSec,
+      fastAmps: s16(b, 30) / 600,
+      outPosV: u16(b, 32) * K46,
+      mahIn: u32(b, 34) / 2160,
+      fuel: u16(b, 38) / 10,
+      startFuel: u16(b, 40) / 10,
+      amps: s16(b, 42) / 600,
+      safetyCharge: bit(flags, 0), complete: bit(flags, 8), reduceAmps: bit(flags, 11), showIR: bit(flags, 12), nodeOnly: bit(flags, 14), coldWeather: bit(flags, 15),
+      dischargeOn: bit(rx, 1), regen: bit(rx, 4), chargeOn: bit(rx, 6), balancing: bit(rx, 7), useNodes: bit(rx, 8), useFuel: bit(rx, 9),
+      highTemp: bit(st2, 2), cellCountVerified: bit(st2, 12),
+      vrAmps, vrOffset: vrOff, ir,
+      maxCellV: u16(b, 74) / 12797,
+      cv: bit(st6, 4), presetValid: bit(st6, 5), regenPossible: bit(st6, 7), regenFailed: bit(st6, 8), errorsLogged: bit(st6, 15),
+      supplyAmps: s16(b, 80) / 150,
+      battPosAvgV: u16(b, 82) * K46 / 16,
+      mahOut: u32(b, 84) / 2160,
+      regenVSet: s16(b, 90) * K46,
+      dsetAmps: u16(b, 92) / 600,
+      negDrop: s16(b, 96) * K46, posDrop: s16(b, 98) * K46,
+      slowAmps: s16(b, 116) / 600,
+      presetAmps: s16(b, 118) / 600,
+      slavesFound: u16(b, 120),
+      balancer: Array.from(b.slice(124, 132)),
+      mode, error: b[134], chem: b[135], packs,
+      preset: b[137],                                  // zero-based
+      screen: b[139], cycle: b[142], reduceReason: b[143], startMode: b[144], regenFailReason: b[145]
+    };
+    const n = s.cellCount || 0;
+    s.packV = s.useNodes && n ? cellsRaw.slice(0, n).reduce((a, v) => a + v, 0) : s.battPosAvgV;
+    s.setAmps = mode === 8 ? s.dsetAmps : s.csetAmps;
+    s.running = [1, 2, 3, 6, 7, 8, 9, 10, 11].includes(mode);
+    s.stoppable = [6, 7, 8, 9, 11].includes(mode);
+    const st = statusText(s); s.text = st.text; s.kind = st.kind;
+    return s;
+  }
+
+  function statusText(s) {
+    switch (s.mode) {
+      case 0: return { text: "Ready to start", kind: "idle" };
+      case 1: return { text: "Detecting cells", kind: "run" };
+      case 2: return { text: "Channel 1 startup", kind: "run" };
+      case 3: return { text: "Channel 1/2 startup", kind: "run" };
+      case 6: return s.complete ? { text: "Charge complete", kind: "done" } : s.reduceAmps ? { text: "Low voltage restore", kind: "run" } : { text: "Charging", kind: "run" };
+      case 7: return s.complete ? { text: "Charge complete", kind: "done" } : s.chem === 8 ? { text: "Finishing", kind: "run" } : { text: "Trickle charge", kind: "run" };
+      case 8: return s.complete ? { text: "Discharge complete", kind: "done" } : s.regen ? { text: "Regenerative discharge", kind: "run" } : { text: "Discharging", kind: "run" };
+      case 9: return { text: "Monitoring cells", kind: "run" };
+      case 10: return { text: "Safety screen: press Enter", kind: "wait" };
+      case 11: return { text: "Cooling down", kind: "run" };
+      case 30: return { text: "Expansion (slave) mode", kind: "idle" };
+      case 99: return { text: "Safety code " + s.error + ": " + (ERR[s.error] || "Unknown"), kind: "err" };
+      default: return { text: "Mode " + s.mode, kind: "idle" };
+    }
+  }
+
+  // ---- preset memory (7680 bytes = 3840 big-endian words) → 25 presets
+  const pStart = p => (p - 1) * 51 + Math.floor((p - 1) / 5);
+  function parsePresets(b) {
+    const w = i => (b[i * 2] << 8) | b[i * 2 + 1];
+    const out = [];
+    for (let p = 1; p <= 25; p++) {
+      const s = pStart(p);
+      let empty = true;
+      for (let k = 0; k <= 49; k++) { const v = k === 47 ? (w(s + k) & 0x7FFF) : w(s + k); if (v) { empty = false; break; } }
+      let name = "";
+      for (let k = 2; k <= 15; k++) { const v = w(s + k); for (const c of [v & 255, v >> 8]) name += (c >= 32 && c <= 125) ? String.fromCharCode(c) : " "; }
+      const ampsRaw = (w(s + 16) >> 4) & 0x7FF;
+      out.push({
+        n: p, empty,
+        name: name.replace(/\s+/g, " ").trim(),
+        chem: (w(s + 29) >> 6) & 31,
+        shown: ((w(s + 16) >> 15) & 1) === 1,
+        validated: ((w(s + 18) >> 14) & 3) === 1,
+        cells: w(s + 41) & 63,
+        capacity: (w(s + 18) & 0x3FFF) * 5,
+        chargeMa: ampsRaw < 200 ? ampsRaw * 5 : 1000 + (ampsRaw - 200) * 50,
+        powerMode: w(s + 16) & 15,
+        dischargeMode: (w(s + 42) >> 9) & 7,
+        cycles: (w(s + 44) >> 10) & 7
+      });
+    }
+    return out;
+  }
+
+  return { enc, crc16, ram, selP, sel, prst, parseStatus, parsePresets, pStart, CHEM, CHEM_LONG, RANGE, REDUCE, ERR, CRC_RAM, CRC_SELP, CRC_PRST, ACK, u16 };
+})();
+
+/* =====================================================================
+   Link: one request at a time over a byte stream, tolerant of the
+   single-wire echo (the bridge hears its own TX), noise and retries.
+   ===================================================================== */
+class Link {
+  constructor(transport, log) {
+    this.t = transport; this.log = log || (() => {});
+    this.rx = []; this.cur = null; this.chain = Promise.resolve();
+    this.stats = { ok: 0, crc: 0, timeout: 0, bytesIn: 0, bytesOut: 0 };
+    transport.onData = d => this._data(d);
+  }
+  _data(d) {
+    this.stats.bytesIn += d.length;
+    if (!this.cur) return;               // unsolicited noise
+    for (const x of d) this.rx.push(x);
+    this._check();
+  }
+  _check() {
+    const c = this.cur; if (!c) return;
+    const tx = c.req.tx, need = c.req.len, buf = this.rx;
+    // Look for the echoed command, then take the reply after it.
+    for (let i = 0; i + tx.length <= buf.length; i++) {
+      let m = true; for (let k = 0; k < tx.length; k++) if (buf[i + k] !== tx[k]) { m = false; break; }
+      if (!m) continue;
+      const st = i + tx.length;
+      if (buf.length - st < need) return;  // keep waiting
+      const r = buf.slice(st, st + need);
+      if (c.req.ok(r)) return this._finish(r);
+    }
+    // Some links don't echo: accept a bare reply of exactly the right size.
+    if (buf.length >= need) {
+      const r = buf.slice(buf.length - need);
+      if (c.req.ok(r)) return this._finish(r);
+    }
+  }
+  _finish(r) {
+    const c = this.cur; this.cur = null; clearTimeout(c.timer); this.rx = [];
+    this.stats.ok++; c.resolve(Uint8Array.from(r));
+  }
+  request(req, { timeout = 1500, retries = 2 } = {}) {
+    const run = async () => {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try { return await this._once(req, timeout); }
+        catch (e) {
+          if (e.code === "timeout") { this.stats.timeout++; if (this.rx.length) this.stats.crc++; }
+          this.log(`${req.name}: ${e.message}${attempt < retries ? ", retrying" : ""}`);
+          if (attempt === retries || e.code === "closed") throw e;
+          await new Promise(r => setTimeout(r, 120));
+        }
+      }
+    };
+    const p = this.chain.then(run, run);
+    this.chain = p.catch(() => {});
+    return p;
+  }
+  _once(req, timeout) {
+    return new Promise((resolve, reject) => {
+      this.rx = [];
+      const timer = setTimeout(() => {
+        this.cur = null;
+        const e = new Error(this.rx.length ? `bad reply (${this.rx.length} bytes)` : "no reply"); e.code = "timeout"; reject(e);
+      }, timeout);
+      this.cur = { req, resolve, reject, timer };
+      this.stats.bytesOut += req.tx.length;
+      Promise.resolve(this.t.write(Uint8Array.from(req.tx))).catch(err => {
+        clearTimeout(timer); this.cur = null; const e = new Error("write failed: " + err.message); e.code = "closed"; reject(e);
+      });
+    });
+  }
+}
+
+/* =====================================================================
+   Simulated PowerLab 8: answers the same byte protocol, including the
+   single-wire echo, so the app and parser are exercised end to end.
+   ===================================================================== */
+class SimCharger {
+  constructor() {
+    this.speed = 30;
+    this.presets = [
+      { name: "6S 5000 Race Pack", chem: 1, cells: 6, cap: 5000, ma: 5000 },
+      { name: "4S 2200 Trainer", chem: 1, cells: 4, cap: 2200, ma: 2200 },
+      { name: "LiPo Storage", chem: 1, cells: 0, cap: 0, ma: 3000 },
+      { name: "3S 1300 Quad", chem: 1, cells: 3, cap: 1300, ma: 2600 },
+      { name: "LiFe 2S Receiver", chem: 9, cells: 2, cap: 1700, ma: 1700 },
+      { name: "NiMH 6 Cell Tx", chem: 7, cells: 0, cap: 2000, ma: 1000 },
+      { name: "8S 10000 Bench", chem: 1, cells: 8, cap: 10000, ma: 10000 },
+      { name: "A123 4S 2300", chem: 3, cells: 4, cap: 2300, ma: 4000 },
+      { name: "Lead 12V 7Ah", chem: 8, cells: 6, cap: 7000, ma: 1400 }
+    ];
+    this.preset = 0; this.mode = 0; this.err = 0; this.screen = 1;
+    this.n = 6; this.capMah = 5000;
+    this.soc = [0.30, 0.31, 0.29, 0.305, 0.30, 0.315, 0.3, 0.3];
+    this.irm = [3.1, 2.8, 3.4, 3.0, 2.9, 3.3, 3.0, 3.0];
+    this.amps = 0; this.setA = 0; this.sec = 0; this.mahIn = 0; this.mahOut = 0;
+    this.complete = false; this.op = "C"; this.packs = 1; this.cycle = 0; this.cv = false; this.phaseT = 0;
+    this.tempC = 31; this.bal = new Array(8).fill(0); this.vrAmps = 0; this.showIR = false;
+    this.last = performance.now();
+  }
+  get p() { return this.presets[this.preset] || { name: "", chem: 0, cells: 0, cap: 0, ma: 0 }; }
+  ocv(soc) { // per-cell open circuit voltage for the active chemistry
+    const c = this.p.chem, x = Math.max(0, Math.min(1, soc));
+    if (c === 9 || c === 3) return 2.9 + 0.4 * x + 0.3 * Math.pow(x, 8);
+    if (c === 7 || c === 6) return 1.18 + 0.2 * x + 0.12 * Math.pow(x, 10);
+    if (c === 8) return 1.95 + 0.2 * x + 0.15 * Math.pow(x, 6);
+    return 3.45 + 0.55 * x + 0.2 * Math.pow(x, 4) - 0.25 * Math.exp(-x * 14);
+  }
+  vmax() { const c = this.p.chem; return c === 9 || c === 3 ? 3.6 : c === 7 || c === 6 ? 1.6 : c === 8 ? 2.45 : 4.2; }
+  vmin() { const c = this.p.chem; return c === 9 || c === 3 ? 2.8 : c === 7 || c === 6 ? 1.0 : c === 8 ? 1.9 : 3.6; }
+  cellV(i) { return this.ocv(this.soc[i]) + this.amps / this.packs * this.irm[i] / 1000; }
+  step() {
+    const now = performance.now(); let dt = (now - this.last) / 1000 * this.speed; this.last = now;
+    while (dt > 0) { const h = Math.min(dt, 2); this._step(h); dt -= h; }
+  }
+  _step(h) {
+    const m = this.mode;
+    if (m === 0 || m === 99 || m === 10) { this.amps = 0; this.bal.fill(0); return; }
+    this.sec += h; this.phaseT += h;
+    if (m === 1) { if (this.phaseT > 4) { this.phaseT = 0; this.mode = this.op === "M" ? 9 : 10; this.screen = 5; } return; }
+    if (m === 11) { this.amps = 0; if (this.phaseT > 60) { this.phaseT = 0; this.mode = 8; this.complete = false; } this.cool(h); return; }
+    if (m === 9) { this.amps = 0; this.balance(h, 0); return; }
+    const cap = this.capMah * this.packs;
+    if (m === 6) {
+      if (this.complete) { this.amps = 0; return; }
+      const target = this.setA;
+      const vmax = Math.max(...this.soc.slice(0, this.n).map((s, i) => this.ocv(s) + target / this.packs * this.irm[i] / 1000));
+      if (vmax >= this.vmax()) {
+        this.cv = true;
+        const hi = this.soc.slice(0, this.n).reduce((a, s, i) => this.ocv(s) > this.ocv(this.soc[a]) ? i : a, 0);
+        const room = (this.vmax() - this.ocv(this.soc[hi])) / (this.irm[hi] / 1000) * this.packs;
+        this.amps = Math.max(0, Math.min(target, this.amps * 0.92 + 0.08 * room));
+      } else { this.cv = false; this.amps += (target - this.amps) * Math.min(1, h); }
+      const dq = this.amps * h / 3.6;               // mAh
+      this.mahIn += dq;
+      for (let i = 0; i < this.n; i++) this.soc[i] = Math.min(1.02, this.soc[i] + dq / cap);
+      this.balance(h, this.amps);
+      if (this.cv && this.amps < Math.max(0.1, this.setA * 0.1)) {
+        this.amps = 0; this.complete = true; this.cv = false;
+        if (this.op === "Y") { this.cycle++; this.mode = 11; this.phaseT = 0; this.complete = false; }
+      }
+      this.heat(h); return;
+    }
+    if (m === 8) {
+      if (this.complete) { this.amps = 0; return; }
+      this.amps = -Math.min(2.5, this.setA);
+      const dq = -this.amps * h / 3.6;
+      this.mahOut += dq;
+      for (let i = 0; i < this.n; i++) this.soc[i] = Math.max(0, this.soc[i] - dq / cap);
+      const vlow = Math.min(...this.soc.slice(0, this.n).map((s, i) => this.cellV(i)));
+      if (vlow <= this.vmin()) {
+        this.amps = 0; this.complete = true;
+        if (this.op === "Y") { this.cycle++; this.mode = 6; this.complete = false; this.phaseT = 0; }
+      }
+      this.heat(h); return;
+    }
+  }
+  balance(h, amps) {
+    const v = this.soc.slice(0, this.n).map((s, i) => this.ocv(s));
+    const lo = Math.min(...v);
+    for (let i = 0; i < 8; i++) {
+      if (i >= this.n) { this.bal[i] = 0; continue; }
+      const d = v[i] - lo;
+      this.bal[i] = v[i] > (this.p.chem === 1 ? 3.85 : 0) && d > 0.004 ? Math.min(31, Math.round(d * 2500)) : 0;
+      this.soc[i] -= this.bal[i] / 32 * 1.0 * h / 3.6 / (this.capMah * this.packs) ;
+    }
+    this.showIR = this.mahIn > this.capMah * 0.05 && this.op !== "M";
+    this.vrAmps = this.showIR ? Math.abs(this.amps) : 0;
+  }
+  heat(h) { const watts = Math.abs(this.amps) * this.n * 3.9; this.tempC += ((30 + watts * 0.035) - this.tempC) * Math.min(1, h / 60); }
+  cool(h) { this.tempC += (30 - this.tempC) * Math.min(1, h / 60); }
+
+  // ---- protocol
+  handle(cmd) {
+    this.step();
+    const s = String.fromCharCode(...cmd.slice(0, 4));
+    if (s.startsWith("Ram") && cmd.length >= 4) return cmd[3] === 0 ? this.status() : null;
+    if (s === "SelP" && cmd.length >= 5) {
+      if (this.mode === 0 && cmd[4] < this.presets.length) this.loadPreset(cmd[4]);
+      const c = PL.crc16([cmd[4]], PL.CRC_SELP); return [c >> 8, c & 255];
+    }
+    if (s.startsWith("Se") && cmd.length >= 4) { this.button(String.fromCharCode(cmd[2]), String.fromCharCode(cmd[3])); return [0x05, 0xDC]; }
+    if (s === "Prst") return this.presetMemory();
+    return null;
+  }
+  loadPreset(i) { this.preset = i; const p = this.p; this.n = p.cells || 6; this.capMah = p.cap || 2000; }
+  button(packChr, op) {
+    const O = op.toUpperCase();
+    if (O === "E") {
+      if (this.mode === 10) { this.mode = this.op === "D" ? 8 : 6; this.phaseT = 0; this.screen = 20; return; }
+      if (this.mode !== 0) { this.mode = 0; this.complete = false; this.amps = 0; this.cv = false; this.err = 0; this.screen = 1; }
+      return;
+    }
+    if (this.mode !== 0) return;
+    const p = this.p; if (!p.name) { this.mode = 99; this.err = 13; return; }
+    this.op = O; this.packs = Math.max(1, packChr.charCodeAt(0) - 0x6B);
+    const bananas = op === O;
+    this.setA = Math.min(bananas ? 40 : 3, p.ma / 1000 * this.packs);
+    this.mode = 1; this.phaseT = 0; this.sec = 0; this.mahIn = 0; this.mahOut = 0; this.complete = false; this.cycle = 0; this.cv = false;
+  }
+  status() {
+    const b = new Uint8Array(149);
+    const W = (o, v) => { v = Math.round(v); if (v < 0) v += 65536; v = Math.max(0, Math.min(65535, v)); b[o] = v >> 8; b[o + 1] = v & 255; };
+    const L = (o, v) => { v = Math.max(0, Math.round(v)); b[o] = (v >>> 24) & 255; b[o + 1] = (v >>> 16) & 255; b[o + 2] = (v >>> 8) & 255; b[o + 3] = v & 255; };
+    const live = this.mode !== 0 && this.mode !== 99;
+    const n = this.n;
+    W(0, 333);
+    for (let i = 0; i < 8; i++) W(2 + i * 2, live && i < n ? (this.cellV(i) + (Math.random() - 0.5) * 0.0015) * 65536 / 5.12 : 0);
+    const supply = 24.1 - Math.abs(this.amps) * n * 3.9 / 24 * 0.012;
+    const packV = live ? Array.from({ length: n }, (_, i) => this.cellV(i)).reduce((a, v) => a + v, 0) : 0;
+    const pin = Math.max(0, this.amps) * packV / 0.92;
+    W(20, this.mode === 6 ? this.setA * 600 : 0);
+    W(22, supply * 16 / (46.96 / 4095)); W(24, supply / (46.96 / 4095));
+    W(26, (this.tempC * 0.00355 + 0.986) * 4095 / 2.5);
+    const sec = Math.floor(this.sec);
+    if (sec < 64800) W(28, sec); else { W(28, 64800 + (sec % 60)); W(78, Math.floor(sec / 60)); }
+    W(30, this.amps * 600); W(32, packV / (46.96 / 4095));
+    L(34, this.mahIn * 2160);
+    const fuel = Math.round(Math.min(1, Math.max(0, this.soc.slice(0, n).reduce((a, v) => a + v, 0) / n)) * 1000);
+    W(38, fuel); W(40, 300);
+    W(42, (this.amps + (live && this.amps ? (Math.random() - 0.5) * 0.02 : 0)) * 600);
+    W(44, (this.complete ? 1 << 8 : 0) | (this.showIR ? 1 << 12 : 0));
+    W(46, (this.mode === 8 ? 2 : 0) | (this.mode === 6 && !this.complete ? 64 : 0) | (this.bal.some(x => x) ? 128 : 0) | (live ? 256 : 0) | 512);
+    W(50, live ? 1 << 12 : 0);
+    for (let i = 0; i < 8; i++) W(52 + i * 2, this.showIR && i < n ? (this.irm[i] * this.vrAmps / this.packs + (i === 0 ? 0.6 * this.vrAmps : 0)) * 6.3984 : 0);
+    W(68, this.vrAmps * 600);
+    W(74, live ? Math.max(...Array.from({ length: n }, (_, i) => this.cellV(i))) * 12797 : 0);
+    W(76, (this.cv ? 16 : 0) | (this.p.name ? 32 : 0));
+    W(80, pin / supply * 150);
+    W(82, packV * 16 / (46.96 / 4095));
+    L(84, this.mahOut * 2160);
+    W(92, this.mode === 8 ? Math.min(2.5, this.setA) * 600 : 0);
+    W(104, 24.1 / (46.96 / 4095));
+    W(114, 0.6 * this.vrAmps * 6.3984);
+    W(116, this.amps * 600); W(118, (this.p.ma || 0) / 1000 * 600);
+    for (let i = 0; i < 8; i++) b[124 + i] = this.bal[i];
+    b[132] = live ? n : 0; b[133] = this.mode; b[134] = this.err; b[135] = this.p.chem; b[136] = this.packs;
+    b[137] = this.preset; b[139] = this.screen; b[142] = this.cycle;
+    b[143] = this.cv ? 7 : 0; b[144] = { C: 0, D: 1, M: 2, Y: 3 }[this.op] || 0;
+    const c = PL.crc16(b, PL.CRC_RAM, 0, 147); b[147] = c >> 8; b[148] = c & 255;
+    return Array.from(b);
+  }
+  presetMemory() {
+    const words = new Uint16Array(3840);
+    this.presets.forEach((p, idx) => {
+      const s = PL.pStart(idx + 1);
+      const name = (p.name + " ".repeat(28)).slice(0, 28);
+      for (let k = 0; k < 14; k++) words[s + 2 + k] = name.charCodeAt(k * 2) | (name.charCodeAt(k * 2 + 1) << 8);
+      const ma = p.ma, raw = ma <= 995 ? Math.round(ma / 5) : 200 + Math.round((ma - 1000) / 50);
+      words[s + 16] = (1 << 15) | ((raw & 0x7FF) << 4) | 1;
+      words[s + 18] = (1 << 14) | Math.round(p.cap / 5);
+      words[s + 29] = (p.chem & 31) << 6;
+      words[s + 41] = p.cells & 63;
+      words[s + 42] = 1 << 9;
+      words[s + 44] = 3 << 10;
+    });
+    const b = new Uint8Array(7682);
+    words.forEach((v, i) => { b[i * 2] = v >> 8; b[i * 2 + 1] = v & 255; });
+    const c = PL.crc16(b, PL.CRC_PRST, 0, 7680); b[7680] = c >> 8; b[7681] = c & 255;
+    return Array.from(b);
+  }
+}
+
+/* Transport around the simulator: echoes like the single-wire line, then
+   delivers the reply in BLE-sized pieces with serial timing. */
+class SimTransport {
+  constructor(sim) { this.sim = sim; this.onData = null; this.kind = "demo"; this.name = "Demo charger"; this.pend = []; }
+  async connect() {}
+  async disconnect() {}
+  write(bytes) {
+    this.pend.push(...bytes);
+    clearTimeout(this._t);
+    this._t = setTimeout(() => {
+      const cmd = this.pend; this.pend = [];
+      const echo = cmd.slice();
+      let reply = this.sim.handle(cmd) || [];
+      if (reply.length && Math.random() < 0.01) { reply = reply.slice(); reply[5 % reply.length] ^= 0x40; } // occasional line noise
+      const all = [...echo, ...reply];
+      const msPerByte = 1000 / 1920;
+      const chunk = 180; let i = 0;
+      const pump = () => {
+        if (i >= all.length) return;
+        const part = all.slice(i, i + chunk); i += chunk;
+        this.onData && this.onData(Uint8Array.from(part));
+        if (i < all.length) setTimeout(pump, Math.max(4, Math.min(60, part.length * msPerByte / 4)));
+      };
+      setTimeout(pump, 25);
+    }, 8);
+    return Promise.resolve();
+  }
+}
+
+/* Web Bluetooth transport for the PL8-Bridge (Nordic UART Service). */
+class BleTransport {
+  static NUS = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+  static RX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+  static TX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+  constructor() { this.onData = null; this.onState = null; this.kind = "ble"; this.name = "PL8-Bridge"; this.wantOpen = false; this.q = Promise.resolve(); }
+  async connect() {
+    this.device = await navigator.bluetooth.requestDevice({ filters: [{ services: [BleTransport.NUS] }, { namePrefix: "PL8" }], optionalServices: [BleTransport.NUS] });
+    this.name = this.device.name || "PL8-Bridge";
+    this.device.addEventListener("gattserverdisconnected", () => this._lost());
+    this.wantOpen = true;
+    await this._open();
+  }
+  async _open() {
+    const server = await this.device.gatt.connect();
+    const svc = await server.getPrimaryService(BleTransport.NUS);
+    this.rxc = await svc.getCharacteristic(BleTransport.RX);
+    const txc = await svc.getCharacteristic(BleTransport.TX);
+    txc.addEventListener("characteristicvaluechanged", e => {
+      const v = e.target.value; this.onData && this.onData(new Uint8Array(v.buffer, v.byteOffset, v.byteLength));
+    });
+    await txc.startNotifications();
+    this.onState && this.onState("live");
+  }
+  async _lost() {
+    this.rxc = null;
+    if (!this.wantOpen) return;
+    this.onState && this.onState("lost");
+    for (let i = 0; this.wantOpen; i++) {
+      await new Promise(r => setTimeout(r, Math.min(15000, 1000 * Math.pow(1.6, i))));
+      if (!this.wantOpen) return;
+      try { await this._open(); return; } catch (e) { /* keep trying */ }
+    }
+  }
+  write(bytes) {
+    const job = async () => {
+      if (!this.rxc) throw new Error("not connected");
+      for (let i = 0; i < bytes.length; i += 20) {
+        const part = bytes.slice(i, i + 20);
+        if (this.rxc.writeValueWithoutResponse) await this.rxc.writeValueWithoutResponse(part);
+        else await this.rxc.writeValue(part);
+      }
+    };
+    const p = this.q.then(job, job); this.q = p.catch(() => {}); return p;
+  }
+  async disconnect() { this.wantOpen = false; try { this.device && this.device.gatt.connected && this.device.gatt.disconnect(); } catch (e) {} }
+}
+
+/* Web Serial transport: a paired Bluetooth Classic SPP adapter (HC-05 and
+   friends) or a USB serial port such as a FUIM3 plugged into this computer. */
+class SerialTransport {
+  static SPP = "00001101-0000-1000-8000-00805f9b34fb";
+  constructor() { this.onData = null; this.onState = null; this.kind = "serial"; this.name = "Serial port"; this.wantOpen = false; this.baud = 19200; this.q = Promise.resolve(); }
+  get isBluetooth() { try { return !!this.port.getInfo().bluetoothServiceClassId; } catch (e) { return false; } }
+  get isOpen() { return !!(this.port && this.port.readable && this.reader); }
+  async connect(baud) {
+    this.port = await navigator.serial.requestPort({ allowedBluetoothServiceClassIds: [SerialTransport.SPP] });
+    const info = this.port.getInfo ? this.port.getInfo() : {};
+    this.name = info.bluetoothServiceClassId ? "Bluetooth serial" : info.usbVendorId === 0x0403 ? "FUIM3 (USB)" : "USB serial";
+    if (baud) this.baud = baud;
+    this.wantOpen = true;
+    if (navigator.serial.addEventListener) navigator.serial.addEventListener("disconnect", e => { if (e.target === this.port) this._lost(); });
+    await this._open();
+  }
+  async _open() {
+    await this.port.open({ baudRate: this.baud, dataBits: 8, stopBits: 1, parity: "none", flowControl: "none", bufferSize: 16384 });
+    // Charge Control keeps DTR on for the FUIM3. Bluetooth ports may refuse signals; that's fine.
+    try { await this.port.setSignals({ dataTerminalReady: true, requestToSend: false }); } catch (e) {}
+    this._readLoop();
+    this.onState && this.onState("live");
+  }
+  async _readLoop() {
+    const port = this.port;
+    while (port.readable && this.wantOpen) {
+      this.reader = port.readable.getReader();
+      try {
+        for (;;) { const { value, done } = await this.reader.read(); if (done) break; if (value && value.length) this.onData && this.onData(value); }
+      } catch (e) { /* port lost or closed */ }
+      finally { try { this.reader.releaseLock(); } catch (e) {} this.reader = null; }
+      if (!this.wantOpen || this._reopening) return;
+      break;
+    }
+    if (this.wantOpen && !this._reopening) this._lost();
+  }
+  async _closePort() {
+    try { if (this.reader) await this.reader.cancel(); } catch (e) {}
+    await new Promise(r => setTimeout(r, 50));
+    try { await this.port.close(); } catch (e) {}
+  }
+  async setBaud(baud) {
+    if (this.baud === baud && this.isOpen) return;
+    this._reopening = true; this.baud = baud;
+    await this._closePort();
+    this._reopening = false;
+    await this._open();
+  }
+  async _lost() {
+    if (this._recovering || !this.wantOpen) return;
+    this._recovering = true;
+    this.onState && this.onState("lost");
+    await this._closePort();
+    for (let i = 0; this.wantOpen; i++) {
+      await new Promise(r => setTimeout(r, Math.min(15000, 1000 * Math.pow(1.6, i))));
+      if (!this.wantOpen) break;
+      try { await this._open(); break; } catch (e) { /* adapter still out of range or unplugged */ }
+    }
+    this._recovering = false;
+  }
+  write(bytes) {
+    const job = async () => {
+      if (!this.port || !this.port.writable) throw new Error("not connected");
+      const w = this.port.writable.getWriter();
+      try { await w.write(bytes); } finally { w.releaseLock(); }
+    };
+    const p = this.q.then(job, job); this.q = p.catch(() => {}); return p;
+  }
+  async disconnect() { this.wantOpen = false; await this._closePort(); }
+}
+
+/* =====================================================================
+   App
+   ===================================================================== */
+(() => {
+  if (typeof document === "undefined") return;
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("pl8r." + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem("pl8r." + k, JSON.stringify(v)); } catch (e) {} }
+  };
+
+  const logLines = [];
+  function log(msg) {
+    const t = new Date(); const ts = t.toTimeString().slice(0, 8);
+    logLines.push(ts + "  " + msg); if (logLines.length > 200) logLines.shift();
+    const el = $("log"); if (el && el.parentElement.open) { el.textContent = logLines.join("\n"); el.scrollTop = el.scrollHeight; }
+  }
+
+  const sim = new SimCharger();
+  let transport = null, link = null, mode = "demo";
+  let status = null, presets = null, lastGood = 0, pollTimer = null, busyCmd = false;
+  let history = [], prevStatus = null, presetsWanted = false;
+
+  // ---------- connection ----------
+  function setChip(s, text) { $("linkChip").dataset.s = s; $("linkText").textContent = text; }
+
+  function useTransport(t) {
+    if (link) link.t.onData = null;
+    transport = t; link = new Link(t, log);
+    status = null; prevStatus = null; presets = null; history = []; lastGood = 0;
+    renderPresets(); render();
+    schedulePoll(50);
+    presetsWanted = true;   // read presets once the charger has answered a status request
+  }
+
+  async function connectBle() {
+    unlockAudio();
+    const why = blockedReason("bluetooth");
+    if (why) { showBleBanner(why); return; }
+    const t = new BleTransport();
+    t.onState = s => {
+      if (s === "live") { setChip("live", t.name); $("bannerLost").hidden = true; log("Bluetooth connected"); }
+      if (s === "lost") { setChip("lost", "Reconnecting…"); $("bannerLost").hidden = false; log("Bluetooth link lost"); }
+    };
+    setChip("busy", "Pick your bridge…");
+    try {
+      await t.connect();
+      enterLive(t, "ble");
+    } catch (e) {
+      log("Connect failed: " + e.message);
+      if (e.name !== "NotFoundError") showBleBanner("Couldn't connect to the bridge: " + e.message + ". Check that it's powered and not connected to another phone.");
+      if (mode === "demo") setChip("demo", "Demo charger");
+    }
+  }
+  function enterLive(t, m) {
+    mode = m; $("bannerDemo").hidden = true; $("bannerBle").hidden = true; $("rowSpeed").hidden = true;
+    $("btnConnect").hidden = true; $("btnSerial").hidden = true; $("btnDisconnect").hidden = false;
+    useTransport(t);
+    setChip("live", t.name);
+  }
+
+  async function connectSerial() {
+    unlockAudio();
+    const why = blockedReason("serial");
+    if (why) { showBleBanner(why); return; }
+    const t = new SerialTransport();
+    t.onState = s => {
+      if (s === "live") { setChip("live", t.name); $("bannerLost").hidden = true; log(`${t.name} open at ${t.baud} baud`); }
+      if (s === "lost") { setChip("lost", "Reconnecting…"); $("bannerLost").hidden = false; log(t.name + " link lost"); }
+    };
+    setChip("busy", "Pick your port…");
+    const pref = $("optBaud").value;
+    try {
+      await t.connect(pref === "115200" ? 115200 : 19200);
+      enterLive(t, "serial");
+      $("baudInfo").textContent = t.isBluetooth ? "Bluetooth serial: the HC-05 sets the line speed" : `Using ${t.baud}`;
+      if (!t.isBluetooth && pref === "auto") autoBaud(t);
+    } catch (e) {
+      log("Serial connect failed: " + e.message);
+      if (e.name !== "NotFoundError") showBleBanner("Couldn't open the serial port: " + e.message + ". For an HC-05, pair it in your system Bluetooth settings first (PIN is usually 1234) and close any other program using it.");
+      if (mode === "demo") setChip("demo", "Demo charger");
+    }
+  }
+
+  // USB serial only: Charge Control runs a FUIM3 at 115200, the spec says 19200. Try both.
+  async function autoBaud(t) {
+    for (let i = 0; i < 4; i++) {
+      const start = Date.now();
+      while (Date.now() - start < 3500) {
+        if (transport !== t) return;
+        if (lastGood >= start) { $("baudInfo").textContent = `Using ${t.baud} (detected)`; log(`Charger answers at ${t.baud} baud`); return; }
+        await new Promise(r => setTimeout(r, 250));
+      }
+      const next = t.baud === 19200 ? 115200 : 19200;
+      log(`No reply at ${t.baud} baud, trying ${next}`);
+      try { await t.setBaud(next); } catch (e) { log("Couldn't change speed: " + e.message); }
+    }
+    $("baudInfo").textContent = "No reply at either speed. Check the charger is on and the adapter is connected.";
+  }
+
+  async function disconnect() {
+    if (transport && transport.kind !== "demo") await transport.disconnect();
+    mode = "demo"; $("bannerDemo").hidden = false; $("bannerLost").hidden = true; $("rowSpeed").hidden = false;
+    $("btnConnect").hidden = false; $("btnSerial").hidden = false; $("btnDisconnect").hidden = true;
+    $("baudInfo").textContent = "USB serial only; Bluetooth serial ignores it";
+    setChip("demo", "Demo charger"); useTransport(new SimTransport(sim));
+  }
+  function blockedReason(feature) {
+    if (feature === "bluetooth" && !("bluetooth" in navigator)) return "This browser can't use Bluetooth LE (Firefox and Safari don't support it). Open this page in Chrome or Edge on Android or a computer, or use Serial / HC-05 instead.";
+    if (feature === "serial" && !("serial" in navigator)) return "This browser can't open serial ports. Use Firefox 151+ or Chrome/Edge 117+ on a computer, or Chrome 137+ on Android. iPhone isn't supported.";
+    if (!window.isSecureContext) return "Connecting needs a secure page. Open this app from an https:// address (for example GitHub Pages) or from localhost.";
+    try {
+      const pol = document.permissionsPolicy || document.featurePolicy;
+      if (pol && pol.allowsFeature && !pol.allowsFeature(feature)) return "Connecting is blocked inside this embedded preview. Open the hosted copy of PL8 Remote in its own browser tab to reach your charger. The demo keeps running here.";
+    } catch (e) {}
+    return "";
+  }
+  function showBleBanner(text) { const b = $("bannerBle"); b.textContent = text; b.hidden = false; }
+
+  // ---------- polling ----------
+  function pollMs() { return +$("optPoll").value || 1000; }
+  function schedulePoll(ms) { clearTimeout(pollTimer); pollTimer = setTimeout(poll, ms); }
+  async function poll() {
+    if (!link) return;
+    if (transport.kind === "demo") sim.speed = +$("optSpeed").value || 30;
+    try {
+      const r = await link.request(PL.ram(0), { timeout: 1500, retries: 1 });
+      onStatus(PL.parseStatus(r));
+    } catch (e) {
+      if (lastGood && Date.now() - lastGood > 6000 && mode !== "demo") setChip("lost", "No data from charger");
+    }
+    renderStats();
+    schedulePoll(pollMs());
+  }
+
+  function onStatus(s) {
+    const was = status; status = s; lastGood = Date.now();
+    if (presetsWanted && !presets) { presetsWanted = false; setTimeout(() => readPresets(true), 100); }
+    if (mode !== "demo" && $("linkChip").dataset.s !== "live" && (transport.rxc || transport.isOpen)) setChip("live", transport.name);
+    // run boundaries + alerts
+    if (was) {
+      if (!was.running && s.running) { history = []; log("Run started: " + s.text); }
+      if (!was.complete && s.complete) alertUser("done", s.text);
+      if (was.mode !== 99 && s.mode === 99) alertUser("err", s.text);
+      if (was.mode !== 10 && s.mode === 10) alertUser("wait", "Safety screen on the charger");
+      if (was.mode !== s.mode) log(`Mode ${was.mode} → ${s.mode} (${s.text})`);
+    }
+    if (s.running || s.complete) {
+      const t = s.seconds;
+      if (!history.length || t !== history[history.length - 1].t) {
+        history.push({ t, v: s.packV, a: s.amps, mi: s.mahIn, mo: s.mahOut, cells: s.cells.slice(0, s.cellCount || 0), sup: s.supplyV, temp: s.tempC, mode: s.mode });
+        if (history.length > 30000) history.splice(0, history.length - 30000);
+      }
+    }
+    render();
+  }
+
+  // ---------- commands ----------
+  async function command(req, label) {
+    if (busyCmd) return false;
+    busyCmd = true; render();
+    try {
+      await link.request(req, { timeout: 1500, retries: 3 });
+      log(label + ": accepted");
+      return true;
+    } catch (e) {
+      log(label + ": failed (" + e.message + ")");
+      flash(label + " didn't go through. Check the bridge connection and try again.");
+      return false;
+    } finally { busyCmd = false; schedulePoll(150); }
+  }
+  async function readPresets(quiet) {
+    if (!link) return;
+    $("btnPresets").disabled = true; $("btnPresets").textContent = "Reading…";
+    try {
+      const r = await link.request(PL.prst(), { timeout: 9000, retries: 1 });
+      presets = PL.parsePresets(r); log("Presets read: " + presets.filter(p => !p.empty).length + " in use");
+    } catch (e) { if (!quiet) flash("Couldn't read presets: " + e.message); log("Preset read failed: " + e.message); }
+    $("btnPresets").disabled = false; $("btnPresets").textContent = "Read from charger";
+    renderPresets(); render();
+  }
+  async function selectPreset(n) {
+    if (!status || status.mode !== 0) { flash("Stop the charger before changing presets."); return; }
+    if (await command(PL.selP(n - 1), "Select preset " + n)) { if (status) status.preset = n - 1; renderPresets(); render(); }
+  }
+
+  // ---------- start dialog ----------
+  function openStart() {
+    if (!status || status.mode !== 0) return;
+    const p = presets && presets[status.preset];
+    if (p) {
+      if (p.empty) { flash("Preset " + p.n + " is empty. Pick another preset first."); return; }
+      if (!p.shown) { flash("Preset " + p.n + " is hidden on the charger."); return; }
+      if (!p.validated) { flash("Preset " + p.n + " hasn't been validated in Charge Control."); return; }
+    }
+    $("dlgTitle").textContent = p ? `Start: ${PL.CHEM[p.chem] || ""} ${p.name}`.trim() : "Start";
+    const opIn = [...document.querySelectorAll('#segOp input')];
+    opIn.forEach(i => { i.disabled = false; });
+    if (p) {
+      opIn.find(i => i.value === "C").disabled = p.powerMode === 0;
+      opIn.find(i => i.value === "D").disabled = p.dischargeMode === 0;
+      opIn.find(i => i.value === "Y").disabled = p.powerMode === 0 || p.dischargeMode === 0 || p.cycles === 0;
+      const chk = opIn.find(i => i.checked); if (chk && chk.disabled) opIn.find(i => !i.disabled).checked = true;
+    }
+    $("selPacks").value = String(store.get("packs", 1));
+    $("chkBananas").checked = store.get("bananas", true);
+    $("dlgStart").showModal();
+  }
+  $("formStart").addEventListener("submit", async e => {
+    const ok = e.submitter && e.submitter.value === "ok";
+    if (!ok) return;
+    const op = document.querySelector('#segOp input:checked').value;
+    const packs = +$("selPacks").value, bananas = $("chkBananas").checked;
+    store.set("packs", packs); store.set("bananas", bananas);
+    const names = { C: "Start charge", D: "Start discharge", M: "Start monitor", Y: "Start cycle" };
+    await command(PL.sel(op, packs, bananas), names[op]);
+  });
+
+  // ---------- rendering ----------
+  const fmt = (v, d) => (isFinite(v) ? v : 0).toFixed(d);
+  function hms(sec) {
+    sec = Math.max(0, Math.floor(sec || 0));
+    const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = sec % 60;
+    return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+  }
+  function mah(v) { return v >= 10000 ? Math.round(v).toLocaleString() : v >= 100 ? Math.round(v).toString() : v.toFixed(1); }
+
+  function render() {
+    const s = status;
+    const p = s && presets ? presets[s.preset] : null;
+    // LCD
+    if (!s) {
+      $("lcd1").textContent = mode !== "demo" ? "Waiting for charger" : "Starting demo";
+      $("lcd2").textContent = "Ram0 …";
+    } else {
+      const chem = PL.CHEM[p ? p.chem : s.chem] || "";
+      $("lcd1").textContent = `${String(s.preset + 1).padStart(2, " ")} ${chem} ${p ? p.name : ""}`.replace(/\s+$/, "") || " ";
+      const line2 = s.running && s.mode !== 10 && s.mode !== 1 ? `${s.text}  ${fmt(Math.abs(s.amps), 2)}A` : s.text;
+      $("lcd2").textContent = line2;
+    }
+    $("lcdSrc").textContent = s ? `FW ${s.fw.toFixed(2)}` : "Ram0";
+    // pill
+    const pill = $("modePill");
+    pill.className = "pill " + (s ? s.kind : "idle");
+    pill.textContent = s ? s.text : (mode !== "demo" ? "No data yet" : "Starting");
+    const why = [];
+    if (s) {
+      if (s.running && s.reduceReason) why.push(PL.REDUCE[s.reduceReason] || "Reason " + s.reduceReason);
+      if (s.safetyCharge) why.push("Safety charge");
+      if (s.nodeOnly) why.push("Balance leads only (3 A max)");
+      if (s.highTemp) why.push("High temperature");
+      if (s.coldWeather) why.push("Cold weather");
+      if (s.regenFailed) why.push("Regen failed: switched to internal discharge");
+      if (s.packs > 1) why.push(s.packs + " packs in parallel");
+      if (s.startMode === 3 && s.running) why.push("Cycle " + (s.cycle + 1));
+    }
+    $("powerWhy").textContent = why.join(" · ");
+
+    // readouts
+    const z = !s;
+    $("rPack").textContent = z ? "0.000" : fmt(s.packV, s.packV >= 10 ? 2 : 3);
+    $("rPackS").textContent = z ? "—" : (s.cellCount ? `${s.cellCount}S${s.cellCountVerified ? " verified" : ""}` : "No cells detected") + (s.cellCount ? ` · avg ${fmt(s.packV / s.cellCount, 3)} V` : "");
+    $("rAmpK").textContent = s && s.amps < 0 ? "Discharge" : "Current";
+    $("rAmps").textContent = z ? "0.00" : fmt(Math.abs(s.amps), 2);
+    $("rAmpsS").textContent = z ? "Set —" : (s.running ? `Set ${fmt(s.setAmps, 2)} A` : `Preset ${fmt(Math.abs(s.presetAmps), 1)} A`) + (s.cv ? " · CV" : "");
+    const dis = s && (s.mode === 8 || (s.mahOut > s.mahIn && !s.chargeOn));
+    $("rCapK").textContent = dis ? "Out of pack" : "Into pack";
+    $("rCap").textContent = z ? "0" : mah(dis ? s.mahOut : s.mahIn);
+    $("rCapS").textContent = z ? "—" : (p && p.capacity ? `${Math.round((dis ? s.mahOut : s.mahIn) / p.capacity * 100)}% of ${p.capacity.toLocaleString()} mAh` : (dis ? `${mah(s.mahIn)} in` : `${mah(s.mahOut)} out`)) + (s.packs > 1 ? " · per pack" : "");
+    $("rTime").textContent = z ? "0:00" : hms(s.seconds);
+    $("rTimeS").textContent = z ? "—" : (s.running ? "Running" : s.complete ? "Finished" : "Idle");
+    $("rSup").textContent = z ? "0.0" : fmt(s.supplyV, 1);
+    $("rSupS").textContent = z ? "—" : `${fmt(Math.max(0, s.supplyAmps), 1)} A in · started ${fmt(s.supplyLoaded || s.supplyV, 1)} V`;
+    const watts = s ? Math.abs(s.amps) * s.packV : 0;
+    $("rWatts").textContent = z ? "0" : Math.round(watts).toString();
+    $("rWattsS").textContent = z ? "—" : (s.amps < 0 ? (s.regen ? "regen discharge" : "discharge") : "to pack");
+    if (s) { const f = s.tempC * 9 / 5 + 32; $("rTemp").textContent = Math.round(f); $("rTempS").textContent = `${Math.round(s.tempC)} °C${s.highTemp ? " · HIGH" : ""}`; }
+    else { $("rTemp").textContent = "—"; $("rTempS").textContent = "—"; }
+    $("rFuel").textContent = s && s.useFuel && s.fuel >= 0 ? Math.floor(s.fuel) : "—";
+    $("rFuelS").textContent = s && s.useFuel ? `started at ${Math.floor(s.startFuel)}%` : "Not used by preset";
+
+    renderActions(); renderCells(); drawChart();
+    $("csvInfo").textContent = history.length + " samples";
+    document.title = s && s.kind === "err" ? "⚠ PL8 Remote" : s && s.kind === "done" ? "✓ PL8 Remote" : s && s.running ? `${fmt(Math.abs(s.amps), 1)}A · PL8 Remote` : "PL8 Remote";
+  }
+
+  function renderActions() {
+    const a = $("actions"); a.textContent = "";
+    const s = status;
+    const add = (txt, cls, fn, dis) => { const b = document.createElement("button"); b.type = "button"; b.className = "btn big " + cls; b.textContent = txt; b.disabled = !!dis || busyCmd; b.onclick = fn; a.appendChild(b); return b; };
+    if (!s) { add("Waiting for charger…", "", null, true); return; }
+    if (s.mode === 0) {
+      add("Start…", "primary", openStart);
+      add("Read presets", "", () => readPresets(false));
+    } else if (s.mode === 10) {
+      add("Acknowledge safety screen", "ack", () => command(PL.sel("E"), "Enter (acknowledge)"));
+      add("Stop", "stop", () => command(PL.sel("E"), "Enter (stop)"));
+    } else if (s.mode === 99) {
+      add("Clear error (Enter)", "ack", () => command(PL.sel("E"), "Enter (clear error)"));
+    } else if (s.complete || s.stoppable) {
+      add(s.complete ? "Finish (Enter)" : "Stop", s.complete ? "primary" : "stop", () => command(PL.sel("E"), "Enter (stop)"));
+    } else {
+      add("Stop", "stop", () => command(PL.sel("E"), "Enter (stop)"));
+    }
+  }
+
+  function renderCells() {
+    const box = $("cells"); const s = status;
+    const n = s ? s.cellCount : 0;
+    const shown = Math.max(n, presets && s && presets[s.preset] && presets[s.preset].cells ? presets[s.preset].cells : 0, 6);
+    const chem = s ? s.chem : 1;
+    const [lo, hi] = PL.RANGE[chem] || [3, 4.2];
+    if (box.children.length !== Math.min(8, Math.max(shown, 1))) {
+      box.textContent = "";
+      for (let i = 0; i < Math.min(8, shown); i++) {
+        const d = document.createElement("div"); d.className = "cell";
+        d.innerHTML = `<div class="h"><span>CELL ${i + 1}</span><span class="tag"></span></div><div class="cv">—</div><div class="bar"><i></i></div><div class="f"><span class="bp">—</span><span class="ir">—</span></div>`;
+        box.appendChild(d);
+      }
+    }
+    const v = s ? s.cells.slice(0, n) : [];
+    const vmax = v.length ? Math.max(...v) : 0, vmin = v.length ? Math.min(...v) : 0;
+    [...box.children].forEach((el, i) => {
+      const on = s && i < n && s.cells[i] > 0.05;
+      el.classList.toggle("off", !on);
+      const cv = on ? s.cells[i] : 0;
+      el.querySelector(".cv").textContent = on ? cv.toFixed(3) : "—";
+      const pct = on ? Math.max(0, Math.min(1, (cv - lo) / (hi - lo))) : 0;
+      const bar = el.querySelector(".bar i"); bar.style.width = (pct * 100).toFixed(1) + "%";
+      bar.style.background = on && cv > hi + 0.02 ? "var(--bad)" : on && n > 1 && (vmax - vmin) > 0.03 && (cv === vmax || cv === vmin) ? "var(--warn)" : "var(--ok)";
+      const tag = el.querySelector(".tag");
+      tag.className = "tag" + (on && n > 1 && cv === vmax && vmax - vmin > 0.002 ? " hi" : on && n > 1 && cv === vmin && vmax - vmin > 0.002 ? " lo" : "");
+      tag.textContent = tag.classList.contains("hi") ? "HIGH" : tag.classList.contains("lo") ? "LOW" : "";
+      el.querySelector(".bp").textContent = on ? (s.balancer[i] ? `Bypass ${Math.round(s.balancer[i] * 99 / 32)}%` : "No bypass") : "—";
+      el.querySelector(".ir").textContent = on && s.showIR && !s.nodeOnly && s.ir[i] > 0 ? `${s.ir[i].toFixed(1)} mΩ` : "— mΩ";
+    });
+    const dEl = $("cellDelta");
+    if (v.length > 1) {
+      const d = (vmax - vmin) * 1000;
+      dEl.textContent = `Δ ${d.toFixed(0)} mV`;
+      dEl.className = "delta" + (d > 50 ? " bad" : d > 20 ? " warn" : "");
+    } else { dEl.textContent = "Δ —"; dEl.className = "delta"; }
+  }
+
+  function renderPresets() {
+    const box = $("presets");
+    if (!presets) { box.innerHTML = `<div class="empty">Presets haven't been read yet. Reading takes about 5 seconds.</div>`; return; }
+    box.textContent = "";
+    const cur = status ? status.preset + 1 : 0;
+    presets.forEach(p => {
+      if (p.empty) return;
+      const b = document.createElement("button"); b.type = "button";
+      b.className = "preset" + (p.n === cur ? " cur" : "");
+      const idle = status && status.mode === 0;
+      b.setAttribute("aria-disabled", idle && p.shown ? "false" : "true");
+      b.setAttribute("aria-label", `Preset ${p.n}, ${PL.CHEM_LONG[p.chem] || ""} ${p.name}`);
+      const meta = [p.cells ? p.cells + "S" : "Auto", p.capacity ? p.capacity.toLocaleString() + " mAh" : "", p.powerMode ? (p.chargeMa / 1000).toFixed(p.chargeMa < 1000 ? 2 : 1) + " A" : "No charge"].filter(Boolean).join(" · ");
+      b.innerHTML = `<span class="n">${p.n}</span><span class="chem">${PL.CHEM[p.chem] || "—"}</span><span class="nm"></span><span class="meta"></span>`;
+      b.querySelector(".nm").textContent = p.name || "(no name)" ;
+      b.querySelector(".meta").textContent = (!p.shown ? "Hidden · " : !p.validated ? "Not validated · " : "") + meta;
+      b.onclick = () => { if (p.n !== cur) selectPreset(p.n); };
+      box.appendChild(b);
+    });
+    if (!box.children.length) box.innerHTML = `<div class="empty">The charger reported no presets in use.</div>`;
+  }
+
+  function renderStats() {
+    if (!link) return;
+    const st = link.stats;
+    $("stats").textContent = `${st.ok} good replies · ${st.timeout} timeouts · ${st.crc} bad checksums · ${st.bytesOut} bytes out · ${st.bytesIn} bytes in` + (status ? ` · charger FW ${status.fw.toFixed(2)}` : "");
+  }
+
+  // ---------- chart ----------
+  const cv = $("chart");
+  function drawChart() {
+    const box = cv.parentElement; const dpr = window.devicePixelRatio || 1;
+    const W = box.clientWidth, H = box.clientHeight; if (!W || !H) return;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const css = getComputedStyle(document.documentElement);
+    const col = k => css.getPropertyValue(k).trim();
+    const pad = { l: 44, r: 40, t: 10, b: 24 };
+    const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+    g.font = "12px " + col("--f-ui"); g.fillStyle = col("--muted");
+    if (history.length < 2) {
+      g.textAlign = "center"; g.fillText("The chart fills in once a charge, discharge or monitor run starts.", W / 2, H / 2); $("chartInfo").textContent = ""; return;
+    }
+    const t0 = history[0].t, t1 = history[history.length - 1].t;
+    const span = Math.max(60, t1 - t0);
+    const vs = history.map(h => h.v), as = history.map(h => Math.abs(h.a));
+    let vmin = Math.min(...vs), vmax = Math.max(...vs); if (vmax - vmin < 0.2) { const m = (vmax + vmin) / 2; vmin = m - 0.1; vmax = m + 0.1; }
+    const vpad = (vmax - vmin) * 0.1; vmin -= vpad; vmax += vpad;
+    const amax = Math.max(1, Math.ceil(Math.max(...as) * 1.15));
+    const X = t => pad.l + (t - t0) / span * pw, YV = v => pad.t + (1 - (v - vmin) / (vmax - vmin)) * ph, YA = a => pad.t + (1 - a / amax) * ph;
+    // grid + axes
+    g.strokeStyle = col("--chart-grid"); g.lineWidth = 1; g.textAlign = "right"; g.textBaseline = "middle";
+    for (let i = 0; i <= 4; i++) {
+      const y = pad.t + ph * i / 4; g.beginPath(); g.moveTo(pad.l, y + .5); g.lineTo(W - pad.r, y + .5); g.stroke();
+      g.fillStyle = col("--chart-v"); g.fillText((vmax - (vmax - vmin) * i / 4).toFixed(2), pad.l - 6, y);
+      g.fillStyle = col("--chart-a"); g.textAlign = "left"; g.fillText((amax - amax * i / 4).toFixed(1), W - pad.r + 6, y); g.textAlign = "right";
+    }
+    g.fillStyle = col("--muted"); g.textAlign = "center"; g.textBaseline = "top";
+    const mins = span / 60, stepM = [1, 2, 5, 10, 15, 30, 60, 120].find(s => mins / s <= 6) || 240;
+    for (let m = 0; m <= mins; m += stepM) g.fillText(m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? String(m % 60).padStart(2, "0") : ""}` : `${m}m`, X(t0 + m * 60), H - pad.b + 6);
+    // series (decimate to ~2 points per pixel)
+    const stride = Math.max(1, Math.floor(history.length / (pw * 2)));
+    const line = (fy, key, color, fill) => {
+      g.beginPath();
+      for (let i = 0; i < history.length; i += stride) { const h = history[i]; const x = X(h.t), y = fy(key(h)); i ? g.lineTo(x, y) : g.moveTo(x, y); }
+      const h = history[history.length - 1]; g.lineTo(X(h.t), fy(key(h)));
+      g.strokeStyle = color; g.lineWidth = 2; g.lineJoin = "round"; g.stroke();
+      if (fill) { g.lineTo(X(h.t), pad.t + ph); g.lineTo(X(t0), pad.t + ph); g.closePath(); g.globalAlpha = .1; g.fillStyle = color; g.fill(); g.globalAlpha = 1; }
+      g.beginPath(); g.arc(X(h.t), fy(key(h)), 3.5, 0, Math.PI * 2); g.fillStyle = color; g.fill();
+    };
+    line(YA, h => Math.abs(h.a), col("--chart-a"), true);
+    line(YV, h => h.v, col("--chart-v"), false);
+    const last = history[history.length - 1];
+    $("chartInfo").textContent = `${hms(last.t - t0)} · ${mah(Math.max(last.mi, last.mo))} mAh`;
+  }
+  new ResizeObserver(() => drawChart()).observe(cv.parentElement);
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawChart); } catch (e) {}
+  new MutationObserver(drawChart).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // ---------- alerts ----------
+  let actx = null;
+  function unlockAudio() { try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); } catch (e) {} }
+  function beep(pattern) {
+    if (!$("optSound").checked || !actx) return;
+    let t = actx.currentTime + 0.02;
+    for (const [f, d] of pattern) {
+      const o = actx.createOscillator(), g = actx.createGain(); o.type = "square"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + d + 0.02); t += d + 0.08;
+    }
+  }
+  function alertUser(kind, text) {
+    log("Alert: " + text);
+    const pat = kind === "done" ? [[1320, .12], [1760, .2]] : kind === "err" ? [[440, .35], [330, .5], [440, .35]] : [[990, .15], [990, .15]];
+    beep(pat);
+    if ($("optVibrate").checked && navigator.vibrate) { try { navigator.vibrate(kind === "err" ? [400, 150, 400, 150, 400] : [200, 100, 200]); } catch (e) {} }
+  }
+  let flashTimer = null;
+  function flash(text) {
+    const b = $("bannerBle"); b.textContent = text; b.hidden = false; clearTimeout(flashTimer); flashTimer = setTimeout(() => { b.hidden = true; }, 6000);
+  }
+
+  // ---------- wake lock ----------
+  let wake = null;
+  async function setWake(on) {
+    try {
+      if (on && "wakeLock" in navigator) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => { wake = null; }); }
+      else if (wake) { await wake.release(); wake = null; }
+    } catch (e) { if (on) { $("optWake").checked = false; flash("This browser won't keep the screen on from here."); } }
+  }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && $("optWake").checked && !wake) setWake(true); });
+
+  // ---------- CSV ----------
+  function csv() {
+    const head = ["seconds", "mode", "pack_V", "amps", "mAh_in", "mAh_out", "supply_V", "temp_F", ...Array.from({ length: 8 }, (_, i) => "cell" + (i + 1) + "_V")];
+    const rows = history.map(h => [h.t, h.mode, h.v.toFixed(3), h.a.toFixed(2), h.mi.toFixed(1), h.mo.toFixed(1), h.sup.toFixed(2), (h.temp * 9 / 5 + 32).toFixed(0), ...Array.from({ length: 8 }, (_, i) => h.cells[i] != null ? h.cells[i].toFixed(3) : "")].join(","));
+    return [head.join(","), ...rows].join("\n");
+  }
+  $("btnCopyCsv").onclick = async () => {
+    const text = csv();
+    try { await navigator.clipboard.writeText(text); flash(`Copied ${history.length} samples as CSV.`); }
+    catch (e) { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); flash("Copied CSV."); } catch (_) { flash("Copy isn't allowed here. Use Save CSV."); } ta.remove(); }
+  };
+  $("btnSaveCsv").onclick = () => {
+    try {
+      const url = URL.createObjectURL(new Blob([csv()], { type: "text/csv" }));
+      const a = document.createElement("a"); a.href = url; a.download = `pl8-run-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.csv`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e) { flash("Saving isn't allowed here. Use Copy CSV."); }
+  };
+
+  // ---------- wiring ----------
+  $("btnConnect").onclick = connectBle;
+  $("btnDisconnect").onclick = disconnect;
+  $("btnSerial").onclick = connectSerial;
+  $("optBaud").value = store.get("baud", "19200");
+  $("optBaud").onchange = async () => {
+    const v = $("optBaud").value; store.set("baud", v);
+    if (transport && transport.kind === "serial" && !transport.isBluetooth && v !== "auto") {
+      try { await transport.setBaud(+v); $("baudInfo").textContent = `Using ${v}`; } catch (e) { flash("Couldn't change speed: " + e.message); }
+    }
+  };
+  $("btnPresets").onclick = () => readPresets(false);
+  $("btnClearChart").onclick = () => { history = []; drawChart(); render(); };
+  $("btnTestAlert").onclick = () => { unlockAudio(); alertUser("done", "Test alert"); };
+  $("optWake").onchange = e => setWake(e.target.checked);
+  $("optPoll").onchange = () => { store.set("poll", $("optPoll").value); schedulePoll(50); };
+  $("optSpeed").onchange = () => store.set("speed", $("optSpeed").value);
+  for (const id of ["optSound", "optVibrate"]) { $(id).checked = store.get(id, true); $(id).onchange = e => store.set(id, e.target.checked); }
+  $("optPoll").value = store.get("poll", "1000");
+  $("optSpeed").value = store.get("speed", "30");
+  document.querySelector("details").addEventListener("toggle", e => { if (e.target.open) { $("log").textContent = logLines.join("\n"); } });
+  document.addEventListener("pointerdown", unlockAudio, { once: true });
+  $("chkBananas").onchange = e => { $("dlgNote").textContent = e.target.checked ? "Without the main leads the PowerLab charges through the balance wires only, limited to 3 A." : "Balance-wire-only mode: the PowerLab limits current to 3 A."; };
+
+  const blocked = blockedReason("bluetooth");
+  if (blocked && !("bluetooth" in navigator)) $("btnConnect").title = blocked;
+
+  // Demo: open in a realistic working state (a charge already under way).
+  sim.loadPreset(0); sim.button("l", "C"); sim.mode = 6; sim.sec = 1260; sim.mahIn = 1180; sim.soc = sim.soc.map(x => x + 0.24);
+  useTransport(new SimTransport(sim));
+  window.PL8 = { PL, sim, get status() { return status; }, get presets() { return presets; }, get link() { return link; }, get history() { return history; } };
+})();
+</script>
